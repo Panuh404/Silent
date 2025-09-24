@@ -1,0 +1,22 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local ="clr-namespace:Silent.UI"
+        xmlns:controls="clr-namespace:Silent.UI.Controls"
+        mc:Ignorable="d" 
+        d:DesignWidth="1000" d:DesignHeight="700"
+        x:Class="Silent.UI.MainWindow"
+        Title="Silent Editor">
+    <Grid RowDefinitions="Auto,*">
+        <DockPanel Grid.Row="0" LastChildFill="False" Margin="8">
+            <TextBlock Text="TODO: TOP BAR" FontWeight="Bold"/>
+        </DockPanel>
+
+        <ScrollViewer Grid.Row="1" 
+                      HorizontalScrollBarVisibility="Auto" 
+                      VerticalScrollBarVisibility="Auto">
+            <controls:EditorView Margin="8"/>
+        </ScrollViewer>
+    </Grid>
+</Window>

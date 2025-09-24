@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Silent.UI/Silent.UI.csproj" />
+  <Project Path="Silent.Core/Silent.Core.csproj" />
+</Solution>
