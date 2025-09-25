@@ -109,7 +109,7 @@ namespace Silent.UI.Controls
                 context.DrawLine(pen, new Point(x, y), new Point(x, y + caretH));
             }
         }
-
+        
         private void InvalidateLayout()
         {
             _layout = null;
@@ -123,6 +123,64 @@ namespace Silent.UI.Controls
             if (e.Text == "\r") return; // ignore CR
             if (e.Text == "\n") { Insert("\n"); return; }
             Insert(e.Text);
+        }
+
+        private static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c == '_';
+
+        private int NextWordBoundary(int pos, bool IncludeTrailingWhitespace = false)
+        {
+            var len = _buffer.Length;
+            if (pos >= len) return len;
+
+            var text = _buffer.GetText(0, len);
+            int i = pos;
+            
+            // If starting on whitespace, first skip it
+            if (i < len && char.IsWhiteSpace(text[i]))
+            {
+                while (i < len && char.IsWhiteSpace(text[i])) i++;
+                if (!IncludeTrailingWhitespace) return i;
+            }
+
+            // If on a word run, skip it
+            if (i < len && IsWordChar(text[i]))
+            {
+                while (i < len && IsWordChar(text[i])) i++;
+            }
+            else
+            {
+                // Otherwise skip a non-word, non-space run (punctuation etc.)
+                while (i < len && !IsWordChar(text[i]) && !char.IsWhiteSpace(text[i])) i++;
+            }
+
+            if (IncludeTrailingWhitespace)
+                while (i < len && char.IsWhiteSpace(text[i])) i++;
+
+            return i;
+        }
+        
+        private int PrevWordBoundary(int pos)
+        {
+            if (pos <= 0) return 0;
+
+            var len = _buffer.Length;
+            var text = _buffer.GetText(0, len);
+            int i = Math.Min(pos, len) - 1;
+
+            // Skip whitespace leftwards
+            while (i >= 0 && char.IsWhiteSpace(text[i])) i--;
+            if (i < 0) return 0;
+
+            // If now on word, go to start of that word
+            if (IsWordChar(text[i]))
+            {
+                while (i >= 0 && IsWordChar(text[i])) i--;
+                return i + 1;
+            }
+
+            // Else skip a non-word, non-space run (punctuation etc.)
+            while (i >= 0 && !IsWordChar(text[i]) && !char.IsWhiteSpace(text[i])) i--;
+            return i + 1;
         }
 
         private void Insert(string s)
@@ -161,7 +219,7 @@ namespace Silent.UI.Controls
                         _caret--;
                         InvalidateLayout();
                     }
-                    e.Handled = true; 
+                    e.Handled = true;
                     break;
                 case Key.Delete:
                     if (_caret < _buffer.Length)
@@ -169,21 +227,21 @@ namespace Silent.UI.Controls
                         _buffer.Delete(_caret, 1);
                         InvalidateLayout();
                     }
-                    e.Handled = true; 
+                    e.Handled = true;
                     break;
-                case Key.Left: 
-                    _caret = Math.Max(0, _caret - 1); 
-                    ResetDesiredX(); 
+                case Key.Left:
+                    _caret = Math.Max(0, _caret - 1);
+                    ResetDesiredX();
                     _caretVisible = true;
-                    InvalidateVisual(); 
-                    e.Handled = true; 
+                    InvalidateVisual();
+                    e.Handled = true;
                     break;
-                case Key.Right: 
+                case Key.Right:
                     _caret = Math.Min(_buffer.Length, _caret + 1);
-                    ResetDesiredX(); 
-                    _caretVisible = true; 
-                    InvalidateVisual(); 
-                    e.Handled = true; 
+                    ResetDesiredX();
+                    _caretVisible = true;
+                    InvalidateVisual();
+                    e.Handled = true;
                     break;
                 case Key.Up:
                 {
@@ -207,24 +265,69 @@ namespace Silent.UI.Controls
                     e.Handled = true;
                     break;
                 }
-                case Key.Home: 
-                    _caret = 0; 
-                    ResetDesiredX(); 
-                    _caretVisible = true; 
-                    InvalidateVisual(); 
-                    e.Handled = true; 
+                case Key.Home:
+                    _caret = 0;
+                    ResetDesiredX();
+                    _caretVisible = true;
+                    InvalidateVisual();
+                    e.Handled = true;
                     break;
-                case Key.End: 
-                    _caret = _buffer.Length; 
-                    ResetDesiredX(); 
-                    _caretVisible = true; 
-                    InvalidateVisual(); 
+                case Key.End:
+                    _caret = _buffer.Length;
+                    ResetDesiredX();
+                    _caretVisible = true;
+                    InvalidateVisual();
                     e.Handled = true;
                     break;
                 case Key.Enter:
                     Insert("\n");
                     e.Handled = true;
                     break;
+            }
+
+            // Ctrl-modified navigation
+            if ((e.KeyModifiers & KeyModifiers.Control) != 0)
+            {
+                switch (e.Key)
+                {
+                    case Key.Left:
+                        _caret = PrevWordBoundary(_caret);
+                        ResetDesiredX();
+                        _caretVisible = true;
+                        InvalidateVisual();
+                        e.Handled = true;
+                        return;
+                    case Key.Right:
+                        _caret = NextWordBoundary(_caret);
+                        ResetDesiredX();
+                        _caretVisible = true;
+                        InvalidateVisual();
+                        e.Handled = true;
+                        return;
+                    case Key.Delete:
+                    {
+                        int end = NextWordBoundary(_caret, IncludeTrailingWhitespace: true);
+                        if (end > _caret)
+                        {
+                            _buffer.Delete(_caret, end - _caret);
+                            _caretVisible = true;
+                            InvalidateVisual();
+                        }
+                        e.Handled = true;
+                        return;
+                    }
+                    case Key.Back:
+                        int start = PrevWordBoundary(_caret);
+                        if (start < _caret)
+                        {
+                            _buffer.Delete(start, _caret - start);
+                            _caret = start;
+                            _caretVisible = true;
+                            InvalidateVisual();
+                        }
+                        e.Handled = true;
+                        return;
+                }
             }
         }
     }
