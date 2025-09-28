@@ -9,14 +9,20 @@
         x:Class="Silent.UI.MainWindow"
         Title="Silent Editor">
     <Grid RowDefinitions="Auto,*">
-        <DockPanel Grid.Row="0" LastChildFill="False" Margin="8">
-            <TextBlock Text="TODO: TOP BAR" FontWeight="Bold"/>
-        </DockPanel>
+		<Menu Grid.Row="0">
+			<MenuItem Header="_File">
+				<MenuItem Header="_Open..." Click="OnOpenClick"/>
+				<MenuItem Header="_Save"    Click="OnSaveClick"/>
+				<MenuItem Header="Save _As..." Click="OnSaveAsClick"/>
+				<Separator/>
+				<MenuItem Header="E_xit" Click="OnExitClick"/>
+			</MenuItem>
+		</Menu>
 
         <ScrollViewer Grid.Row="1" 
                       HorizontalScrollBarVisibility="Auto" 
                       VerticalScrollBarVisibility="Auto">
-            <controls:EditorView Margin="8"/>
+            <controls:EditorView Margin="8" x:Name="Editor"/>
         </ScrollViewer>
     </Grid>
 </Window>

@@ -25,6 +25,8 @@ namespace Silent.Core.Text
             }
         }
 
+        public event EventHandler? Changed;
+
         public PieceTable(string Initial = "")
         {
             _Original = Initial ?? string.Empty;
@@ -84,6 +86,7 @@ namespace Silent.Core.Text
                 _Pieces.Insert(index + 1, newPiece);
                 _Pieces.Insert(index + 2, right);
             }
+            Changed?.Invoke(this, EventArgs.Empty);
         }
 
         public void Delete(int start, int length)
@@ -136,6 +139,7 @@ namespace Silent.Core.Text
                 length -= cutLen;
                 pos = cutEnd;
             }
+            Changed?.Invoke(this, EventArgs.Empty);
         }
 
         private (int index, int offset) FindPiece(int position)

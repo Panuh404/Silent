@@ -7,6 +7,7 @@ using Avalonia.Media.TextFormatting;
 using Avalonia.Threading;
 using Silent.Core.Text;
 using System;
+using System.Collections.Generic;
 
 namespace Silent.UI.Controls
 {
@@ -16,7 +17,8 @@ namespace Silent.UI.Controls
         private readonly Typeface _typeFace = new("Inter");
         private readonly double _fontSize = 14;
 
-        private readonly IBuffer _buffer;
+        private Document? _document;
+        private IBuffer _buffer = new PieceTable("");
         private int _caret;
         private bool _caretVisible = true;
         private double _desiredCaretX = -1;
@@ -27,6 +29,13 @@ namespace Silent.UI.Controls
         private string _cachedText = string.Empty;
         private double _cachedWidth = -1;
 
+        private bool _showLineNumbers = true;
+        private double _gutterWidth = 0;
+
+        private readonly Brush _gutterBackground = new SolidColorBrush(Color.Parse("#1b1b1b"));
+        private readonly Brush _gutterForeground = new SolidColorBrush(Color.Parse("#A9A9A9"));
+        private readonly Pen _gutterSeparator = new(new SolidColorBrush(Color.Parse("#2a2a2a")), 1);
+        
         private void ResetDesiredX() => _desiredCaretX = -1;
 
         public EditorView()
@@ -40,6 +49,22 @@ namespace Silent.UI.Controls
 
             AddHandler(KeyDownEvent, OnKeyDown, handledEventsToo: true);
             AddHandler(TextInputEvent, OnTextInput, handledEventsToo: true);
+        }
+
+        public Document? Document
+        {
+            get => _document;
+            set
+            {
+                if (_document == value) return;
+
+                _document = value;
+                _buffer = value?.Buffer ?? new PieceTable("");
+
+                // Layout refresh
+                InvalidateMeasure();
+                InvalidateVisual();
+            }
         }
 
         protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -75,7 +100,14 @@ namespace Silent.UI.Controls
             base.Render(context);
 
             var text = _buffer.GetText(0, _buffer.Length);
-            var maxWidth = Math.Max(0, Bounds.Width - Padding * 2);
+            
+            // Gutter
+            var lineStarts = ComputeLineStarts(text);
+            var totalLines = Math.Max(1, lineStarts.Count);
+            var digits = Math.Max(2, (int)Math.Floor(Math.Log10(totalLines)) + 1);
+            _gutterWidth = _showLineNumbers ? MeasureGutterWidth(digits) : 0;
+
+            var maxWidth = Math.Max(0, Bounds.Width - Padding * 2 - _gutterWidth);
 
             // Background
             if (_layout is null || _cachedText != text || Math.Abs(_cachedWidth - maxWidth) > 0.5)
@@ -92,8 +124,38 @@ namespace Silent.UI.Controls
                 _cachedWidth = maxWidth;
             }
 
+            // Draw gutter background and separator
+            if (_showLineNumbers)
+            {
+                var gutterRect = new Rect(0, 0, _gutterWidth, Bounds.Height);
+                context.FillRectangle(_gutterBackground, gutterRect);
+                
+                // Separator line (slightly inside the gutter)
+                var sepX = _gutterWidth - 0.5;
+                context.DrawLine(_gutterSeparator, new Point(sepX, 0), new Point(sepX, Bounds.Height));
+            }
+
+            // Draw line numbers
+            if (_showLineNumbers && _layout is not null)
+            {
+                for (int i = 0; i < totalLines; i++)
+                {
+                    int lineStartIndex = lineStarts[i];
+                    // Y position of the first visual line for this logical line
+                    var rect = _layout.HitTestTextPosition(Math.Clamp(lineStartIndex, 0, _buffer.Length));
+                    var y = Padding + rect.Y;
+
+                    var s = (i + 1).ToString();
+                    var numLayout = new TextLayout(s, _typeFace, _fontSize, foreground: _gutterForeground);
+
+                    // Right-align within gutter
+                    var nx = _gutterWidth - Padding - numLayout.Width;
+                    numLayout.Draw(context, new Point(nx, y));
+                }
+            }
+
             // Draw text
-            var origin = new Point(Padding, Padding);
+            var origin = new Point(Padding + 8 + _gutterWidth, Padding);
             _layout.Draw(context, origin);
 
             // Map caret index to(x, y) and height
@@ -109,7 +171,11 @@ namespace Silent.UI.Controls
                 context.DrawLine(pen, new Point(x, y), new Point(x, y + caretH));
             }
         }
-        
+        public bool ShowLineNumbers
+        {
+            get => _showLineNumbers;
+            set { if (_showLineNumbers != value) { _showLineNumbers = value; InvalidateVisual(); } }
+        }
         private void InvalidateLayout()
         {
             _layout = null;
@@ -206,6 +272,32 @@ namespace Silent.UI.Controls
             // Snap inside text range
             _caret = Math.Clamp(hit.TextPosition, 0, _buffer.Length);
             InvalidateVisual();
+        }
+
+        private static List<int> ComputeLineStarts(ReadOnlySpan<char> text)
+        {
+            var starts = new List<int> { 0 };
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (text[i] == '\n') starts.Add(i + 1);
+            }
+            return starts;
+        }
+
+        private double MeasureGutterWidth(int digits)
+        {
+            // Measure a "worst-case" width by using all 8's (widest digit in most fonts)
+            var sample = new string('8', digits);
+            var tl = new TextLayout(
+                sample,
+                _typeFace,
+                _fontSize,
+                foreground: _gutterForeground,
+                textWrapping: TextWrapping.NoWrap
+            );
+            
+            // Padding: left + right + a little spacing before the separator
+            return Math.Ceiling(tl.Width) + Padding * 3;
         }
 
         private void OnKeyDown(object? sender, KeyEventArgs e)

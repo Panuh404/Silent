@@ -6,5 +6,7 @@
         string GetText(int start, int length);
         void Insert(int position, string text);
         void Delete(int start, int length);
+
+        event EventHandler? Changed;
     }
 }
